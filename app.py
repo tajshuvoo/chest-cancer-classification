@@ -1,53 +1,58 @@
-from flask import Flask, request, jsonify, render_template
+import streamlit as st
+import numpy as np
+import tensorflow as tf
+from PIL import Image
 import os
-from flask_cors import CORS, cross_origin
-from chest_cancer_classification.utils.common import decodeImage
+
 from chest_cancer_classification.pipeline.prediction import PredictionPipeline
 
 
-os.putenv('LANG', 'en_US.UTF-8')
-os.putenv('LC_ALL', 'en_US.UTF-8')
+def main():
+    st.title("Chest Cancer Classification")
+    st.write("Upload a chest CT scan image to predict Adenocarcinoma Cancer or Normal.")
 
-app = Flask(__name__)
-CORS(app)
+    uploaded_file = st.file_uploader(
+        "Choose an image...",
+        type=["jpg", "jpeg", "png"]
+    )
 
+    if uploaded_file is not None:
+        # Open image
+        image = Image.open(uploaded_file)
 
-class ClientApp:
-    def __init__(self):
-        self.filename = "inputImage.jpg"
-        self.classifier = PredictionPipeline(self.filename)
+        # Show uploaded image
+        st.image(image, caption="Uploaded Image", use_column_width=True)
+        st.write("")
+        st.write("Classifying...")
 
+        # 🔧 FIX: Convert RGBA / other modes to RGB (JPEG-safe)
+        if image.mode != "RGB":
+            image = image.convert("RGB")
 
+        # Save the uploaded image to a temp file
+        temp_filename = "inputImage.jpg"
+        image.save(temp_filename, format="JPEG")
 
+        try:
+            # Run prediction
+            predictor = PredictionPipeline(temp_filename)
+            result = predictor.predict()[0]
 
+            st.success("Prediction completed successfully ✅")
 
-@app.route("/", methods=['GET'])
-@cross_origin()
-def home():
-    return render_template('index.html')
+            st.write(f"**Prediction:** {result['image']}")
+            st.write(f"**Probabilities:** {result['probabilities']}")
+            st.write(f"**Predicted class index:** {result['predicted_class']}")
 
+        except Exception as e:
+            st.error("Prediction failed ❌")
+            st.exception(e)
 
-
-@app.route("/train", methods=['GET','POST'])
-@cross_origin()
-def trainRoute():
-    # os.system("python main.py")
-    os.system("dvc repro")
-    return "Training done successfully!"
-
-
-
-
-@app.route("/predict", methods=['POST'])
-@cross_origin()
-def predictRoute():
-    image = request.json['image']
-    decodeImage(image, clApp.filename)
-    result = clApp.classifier.predict()
-    return jsonify(result)
-
+        finally:
+            # Clean up temp file
+            if os.path.exists(temp_filename):
+                os.remove(temp_filename)
 
 
 if __name__ == "__main__":
-    clApp = ClientApp()
-    app.run(host='0.0.0.0', port=8080) 
+    main()
