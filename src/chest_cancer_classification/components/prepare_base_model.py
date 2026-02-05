@@ -23,26 +23,28 @@ class PrepareBaseModel:
     
     @staticmethod
     def _prepare_full_model(model, classes, freeze_all, freeze_till, learning_rate):
-        if freeze_all:
-            for layer in model.layers:
-                model.trainable = False
-        elif (freeze_till is not None) and (freeze_till > 0):
-            for layer in model.layers[:-freeze_till]:
-                model.trainable = False
+        # Unfreeze last 4 layers for fine-tuning
+        for layer in model.layers[:-4]:
+            layer.trainable = False
+        for layer in model.layers[-4:]:
+            layer.trainable = True
 
-        flatten_in = tf.keras.layers.Flatten()(model.output)
+        x = tf.keras.layers.Flatten()(model.output)
+        x = tf.keras.layers.Dense(256, activation='relu')(x)
+        x = tf.keras.layers.Dropout(0.5)(x)
         prediction = tf.keras.layers.Dense(
             units=classes,
             activation="softmax"
-        )(flatten_in)
+        )(x)
 
         full_model = tf.keras.models.Model(
             inputs=model.input,
             outputs=prediction
         )
 
+        # Lower learning rate for transfer learning
         full_model.compile(
-            optimizer=tf.keras.optimizers.SGD(learning_rate=learning_rate),
+            optimizer=tf.keras.optimizers.SGD(learning_rate=0.0001),
             loss=tf.keras.losses.CategoricalCrossentropy(),
             metrics=["accuracy"]
         )
@@ -55,11 +57,10 @@ class PrepareBaseModel:
         self.full_model = self._prepare_full_model(
             model=self.model,
             classes=self.config.params_classes,
-            freeze_all=True,
-            freeze_till=None,
-            learning_rate=self.config.params_learning_rate
+            freeze_all=False,
+            freeze_till=4,
+            learning_rate=0.0001
         )
-
         self.save_model(path=self.config.updated_base_model_path, model=self.full_model)
     
 

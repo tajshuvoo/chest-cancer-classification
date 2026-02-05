@@ -59,6 +59,8 @@ class Training:
             shuffle=True,
             **dataflow_kwargs
         )
+        # Print class indices mapping for debugging
+        print("Class indices:", self.train_generator.class_indices)
 
     
     @staticmethod
