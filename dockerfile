@@ -1,9 +1,12 @@
-FROM python:3.9-slim-buster
+FROM python:3.8-slim-bookworm
 
-RUN apt update -y && apt install awscli -y
 WORKDIR /app
 
-COPY . /app
-RUN pip install -r requirements.txt
+# Install Python dependencies first (better caching)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-CMD ["python3", "app.py"]
+# Copy app source
+COPY . .
+
+CMD ["python", "app.py"]
